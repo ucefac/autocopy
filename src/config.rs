@@ -200,6 +200,7 @@ impl Config {
     }
 
     /// 保存当前配置到默认位置
+    #[allow(dead_code)]
     pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
         let config_dir = dirs::home_dir()
             .ok_or("无法获取用户主目录")?

@@ -17,6 +17,7 @@ use std::sync::Arc;
 pub struct State {
     pub is_mouse_down: bool,
     pub has_selection: bool,
+    #[allow(dead_code)]
     pub last_copy_time: f64,
     pub mouse_down_time: f64,
     pub last_mouse_up_time: f64,

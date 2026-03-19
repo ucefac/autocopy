@@ -104,7 +104,7 @@ fn handle_event(
             let time_diff = now - state_guard.last_mouse_up_time;
             let dx = location.x - state_guard.last_click_x;
             let dy = location.y - state_guard.last_click_y;
-            let distance = ((dx * dx + dy * dy) as f64).sqrt();
+            let distance = (dx * dx + dy * dy).sqrt();
 
             let is_multi_click =
                 time_diff < config.double_click_interval && distance < config.max_click_distance;
