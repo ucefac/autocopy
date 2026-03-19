@@ -1,0 +1,32 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Build output
+*.o
+*.a
+*.so
+*.dylib
+
+# Debug
+*.pdb
+*.ilk
+*.exe
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test
+*.orig
+
+# Config (user specific)
+.config/autocopy/autocopy.ini
+/.claude/

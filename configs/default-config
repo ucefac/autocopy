@@ -1,0 +1,25 @@
+# AutoCopy Configuration
+# 排除的应用列表（逗号分隔）
+excluded_apps=Terminal,iTerm2,Alacritty,Kitty,WezTerm,Kaku
+
+# 最小按压时间阈值（秒）
+min_press_duration=0.5
+
+# 双击检测间隔（秒）
+double_click_interval=0.3
+
+# 最大位置偏移（像素）
+max_click_distance=5
+
+# 日志文件路径
+log_file=~/.config/autocopy/autocopy.log
+
+# 日志级别 (debug, info, warn, error)
+log_level=info
+
+# 是否启用日志
+enable_log=false
+
+# 隐私保护选项
+log_app_name=false
+log_mouse_coords=false
