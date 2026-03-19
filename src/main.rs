@@ -5,7 +5,7 @@ mod logger;
 mod platforms;
 
 use log::{error, info};
-use platforms::{State, PlatformImpl};
+use platforms::{PlatformImpl, State};
 use std::sync::{Arc, Mutex};
 
 fn main() {

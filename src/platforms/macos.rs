@@ -2,8 +2,10 @@
 use super::{PlatformImpl, State};
 use crate::clipboard::copy;
 use crate::config::Config;
-use core_foundation::runloop::{CFRunLoop, kCFRunLoopDefaultMode};
-use core_graphics::event::{CGEvent, CGEventTap, CGEventTapLocation, CGEventTapPlacement, CGEventTapOptions, CGEventType};
+use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop};
+use core_graphics::event::{
+    CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType,
+};
 use log::{debug, info, warn};
 use objc2_app_kit::NSWorkspace;
 use std::sync::{Arc, Mutex};
@@ -104,8 +106,8 @@ fn handle_event(
             let dy = location.y - state_guard.last_click_y;
             let distance = ((dx * dx + dy * dy) as f64).sqrt();
 
-            let is_multi_click = time_diff < config.double_click_interval
-                && distance < config.max_click_distance;
+            let is_multi_click =
+                time_diff < config.double_click_interval && distance < config.max_click_distance;
 
             if is_multi_click {
                 state_guard.click_count = (state_guard.click_count + 1).min(3);
@@ -143,8 +145,10 @@ fn handle_event(
                 true // 双击/三击直接触发
             } else {
                 let result = press_duration >= config.min_press_duration;
-                debug!("单击检测：press_duration={:.3}s, min_press_duration={:.3}s, result={}",
-                      press_duration, config.min_press_duration, result);
+                debug!(
+                    "单击检测：press_duration={:.3}s, min_press_duration={:.3}s, result={}",
+                    press_duration, config.min_press_duration, result
+                );
                 result // 单击检查按压时长
             };
 
@@ -157,8 +161,10 @@ fn handle_event(
                 debug!("触发复制：has_selection=true");
                 copy();
             } else {
-                debug!("不触发复制：should_copy={}, has_selection={}, click_count={}",
-                      should_copy, state_guard.has_selection, state_guard.click_count);
+                debug!(
+                    "不触发复制：should_copy={}, has_selection={}, click_count={}",
+                    should_copy, state_guard.has_selection, state_guard.click_count
+                );
             }
 
             state_guard.has_selection = false;
@@ -174,9 +180,7 @@ fn get_frontmost_app_name() -> Option<String> {
     unsafe {
         let workspace = NSWorkspace::sharedWorkspace();
         let frontmost_app = workspace.frontmostApplication();
-        frontmost_app.and_then(|app| {
-            app.localizedName().map(|name| name.to_string())
-        })
+        frontmost_app.and_then(|app| app.localizedName().map(|name| name.to_string()))
     }
 }
 
