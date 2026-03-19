@@ -31,9 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/ucefac/autocopy/main/install.sh | b
 # 1. 克隆仓库
 git clone https://github.com/ucefac/autocopy.git
 cd autocopy
-
-# 2. 运行安装脚本（仅限 macOS）
-./scripts/install-macos.sh
+cargo run
 ```
 
 ### 配置
