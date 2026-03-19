@@ -15,15 +15,25 @@
 
 ## 快速开始
 
-### macOS 安装
+### 快速安装（推荐）
+
+```bash
+# macOS (ARM64)
+curl -fsSL https://raw.githubusercontent.com/ucefac/autocopy/main/install.sh | bash
+
+# Windows
+# Windows 版本开发中，敬请期待
+```
+
+### 手动安装
 
 ```bash
 # 1. 克隆仓库
 git clone https://github.com/ucefac/autocopy.git
 cd autocopy
 
-# 2. 运行安装脚本
-./install/install.sh
+# 2. 运行安装脚本（仅限 macOS）
+./scripts/install-macos.sh
 ```
 
 ### 配置
@@ -61,7 +71,7 @@ log_mouse_coords=false
 ### 卸载
 
 ```bash
-./install/uninstall-macos.sh
+./scripts/uninstall-macos.sh
 ```
 
 ## 隐私说明
