@@ -20,21 +20,70 @@ final class ClipboardManager {
     /// 复制失败回调
     var onCopyFailure: ((String) -> Void)?
 
-    private init() {}
+    private init() {
+        // 给队列设置特定标记，用于判断当前是否在该队列中
+        clipboardQueue.setSpecific(key: Self.queueKey, value: ())
+    }
 
     // MARK: - 公共接口
 
     /// 执行复制操作
-    /// - Parameter useAXAPI: 是否优先使用AXAPI获取选中文本
-    func performCopy(useAXAPI: Bool = true) {
+    func performCopy() {
         clipboardQueue.async { [weak self] in
             guard let self = self else { return }
+            self.performCopyWithSimulatedShortcut()
+        }
+    }
 
-            if useAXAPI, PermissionManager.shared.hasAccessibilityPermission {
-                self.performCopyWithAXAPI()
-            } else {
-                self.performCopyWithSimulatedShortcut()
+    /// 模拟Cmd+C按键
+    private func simulateCopyShortcut(completion: @escaping () -> Void) {
+        // 所有CGEvent操作必须在主线程执行
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else {
+                completion()
+                return
             }
+
+            let source = CGEventSource(stateID: .hidSystemState)
+
+            // 创建Cmd按下事件
+            guard let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: true) else {
+                completion()
+                return
+            }
+            cmdDown.flags = .maskCommand
+
+            // 创建C按下事件
+            guard let cDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true) else {
+                completion()
+                return
+            }
+            cDown.flags = .maskCommand
+
+            // 创建C释放事件
+            guard let cUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false) else {
+                completion()
+                return
+            }
+            cUp.flags = .maskCommand
+
+            // 创建Cmd释放事件
+            guard let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: false) else {
+                completion()
+                return
+            }
+
+            // 发送事件
+            cmdDown.post(tap: .cghidEventTap)
+            Thread.sleep(forTimeInterval: 0.005) // 小延迟确保按键顺序正确
+            cDown.post(tap: .cghidEventTap)
+            Thread.sleep(forTimeInterval: 0.01)  // 按键按下保持时间
+            cUp.post(tap: .cghidEventTap)
+            Thread.sleep(forTimeInterval: 0.005)
+            cmdUp.post(tap: .cghidEventTap)
+
+            // 延长延迟时间，确保系统有足够时间处理复制操作并更新剪贴板
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: completion)
         }
     }
 
@@ -50,8 +99,13 @@ final class ClipboardManager {
                 return
             }
 
-            self.pasteboard.clearContents()
-            let success = self.pasteboard.setString(text, forType: .string)
+            // NSPasteboard操作必须在主线程执行
+            let success = DispatchQueue.main.sync { [weak self] () -> Bool in
+                guard let self = self else { return false }
+
+                self.pasteboard.clearContents()
+                return self.pasteboard.setString(text, forType: .string)
+            }
 
             if success {
                 LogManager.shared.info("ClipboardManager", "已复制到剪贴板，长度: \(text.count)")
@@ -71,51 +125,26 @@ final class ClipboardManager {
     /// 获取当前剪贴板内容
     /// - Returns: 剪贴板中的文本内容
     func getClipboardContent() -> String? {
-        clipboardQueue.sync {
+        // 内部直接访问方法，必须在主线程中调用
+        func unsafeGetClipboardContent() -> String? {
             pasteboard.string(forType: .string)
         }
+
+        // 判断当前是否已经在主线程
+        if Thread.isMainThread {
+            return unsafeGetClipboardContent()
+        } else {
+            return DispatchQueue.main.sync {
+                unsafeGetClipboardContent()
+            }
+        }
     }
+
+    // 用于标记clipboardQueue的特定key
+    private static let queueKey = DispatchSpecificKey<Void>()
 
     // MARK: - 私有方法
 
-    /// 使用AXAPI执行复制
-    private func performCopyWithAXAPI(retryCount: Int = 0) {
-        let maxRetries = 1 // 最多重试1次
-        LogManager.shared.debug("ClipboardManager", "使用AXAPI模式复制，尝试次数: \(retryCount + 1)")
-
-        guard let selectedText = AccessibilityManager.shared.getSelectedText() else {
-            if retryCount < maxRetries {
-                LogManager.shared.debug("ClipboardManager", "AXAPI获取文本失败，准备重试")
-                // 短暂延迟后重试
-                DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                    guard let self = self else { return }
-                    self.performCopyWithAXAPI(retryCount: retryCount + 1)
-                }
-            } else {
-                LogManager.shared.debug("ClipboardManager", "AXAPI获取文本失败，已重试\(maxRetries)次，降级到模拟快捷键模式")
-                performCopyWithSimulatedShortcut()
-            }
-            return
-        }
-
-        guard !selectedText.isEmpty else {
-            if retryCount < maxRetries {
-                LogManager.shared.debug("ClipboardManager", "没有选中文本，准备重试")
-                // 短暂延迟后重试
-                DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                    guard let self = self else { return }
-                    self.performCopyWithAXAPI(retryCount: retryCount + 1)
-                }
-            } else {
-                LogManager.shared.debug("ClipboardManager", "没有选中文本，已重试\(maxRetries)次，降级到模拟快捷键模式")
-                performCopyWithSimulatedShortcut()
-            }
-            return
-        }
-
-        LogManager.shared.info("ClipboardManager", "通过AXAPI复制成功，长度: \(selectedText.count)，尝试次数: \(retryCount + 1)")
-        writeToClipboard(selectedText)
-    }
 
     /// 使用模拟快捷键执行复制
     private func performCopyWithSimulatedShortcut(retryCount: Int = 0) {
@@ -125,7 +154,7 @@ final class ClipboardManager {
         // 保存当前剪贴板内容
         let originalContent = getClipboardContent()
 
-        AccessibilityManager.shared.simulateCopyShortcut { [weak self] in
+        self.simulateCopyShortcut { [weak self] in
             guard let self = self else { return }
 
             // 延迟后读取剪贴板内容，避免阻塞队列
@@ -177,7 +206,10 @@ final class ClipboardManager {
     private func showToastIfNeeded() {
         guard ConfigManager.shared.get(\.showToast) else { return }
 
-        ToastManager.shared.showSuccess()
-        LogManager.shared.debug("ClipboardManager", "已显示复制成功提示")
+        // UI操作必须在主线程执行
+        DispatchQueue.main.async {
+            ToastManager.shared.showSuccess()
+            LogManager.shared.debug("ClipboardManager", "已显示复制成功提示")
+        }
     }
 }
