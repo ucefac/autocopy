@@ -48,10 +48,10 @@ enum LogLevel: String, Codable, Comparable, CaseIterable {
 struct AppState: Codable {
     /// 是否正在运行
     var isRunning: Bool
-    /// 辅助功能权限是否已授予
-    var hasAccessibilityPermission: Bool
     /// 是否启用自动复制功能
     var autoCopyEnabled: Bool
+    /// 是否已获得辅助功能权限
+    var accessibilityPermissionGranted: Bool
     /// 已复制次数统计
     var copyCount: Int
     /// 应用启动时间
@@ -59,8 +59,8 @@ struct AppState: Codable {
 
     init() {
         self.isRunning = false
-        self.hasAccessibilityPermission = false
         self.autoCopyEnabled = true
+        self.accessibilityPermissionGranted = false
         self.copyCount = 0
         self.launchTime = Date()
     }
