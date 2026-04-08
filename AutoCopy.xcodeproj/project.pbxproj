@@ -49,15 +49,13 @@
                 <string>100000000000000000000003</string>
                 <string>100000000000000000000005</string>
                 <string>100000000000000000000007</string>
-                <string>100000000000000000000009</string>
-                <string>100000000000000000000011</string>
                 <string>100000000000000000000013</string>
                 <string>100000000000000000000015</string>
                 <string>100000000000000000000017</string>
                 <string>100000000000000000000019</string>
                 <string>100000000000000000000021</string>
-                <string>100000000000000000000023</string>
                 <string>100000000000000000000025</string>
+                <string>100000000000000000000034</string>
             </array>
             <key>runOnlyForDeploymentPostprocessing</key>
             <integer>0</integer>
@@ -446,20 +444,6 @@
             <key>isa</key>
             <string>PBXBuildFile</string>
         </dict>
-        <key>100000000000000000000009</key>
-        <dict>
-            <key>fileRef</key>
-            <string>100000000000000000000010</string>
-            <key>isa</key>
-            <string>PBXBuildFile</string>
-        </dict>
-        <key>100000000000000000000011</key>
-        <dict>
-            <key>fileRef</key>
-            <string>100000000000000000000012</string>
-            <key>isa</key>
-            <string>PBXBuildFile</string>
-        </dict>
         <key>100000000000000000000013</key>
         <dict>
             <key>fileRef</key>
@@ -495,17 +479,17 @@
             <key>isa</key>
             <string>PBXBuildFile</string>
         </dict>
-        <key>100000000000000000000023</key>
-        <dict>
-            <key>fileRef</key>
-            <string>100000000000000000000024</string>
-            <key>isa</key>
-            <string>PBXBuildFile</string>
-        </dict>
         <key>100000000000000000000025</key>
         <dict>
             <key>fileRef</key>
             <string>100000000000000000000026</string>
+            <key>isa</key>
+            <string>PBXBuildFile</string>
+        </dict>
+        <key>100000000000000000000034</key>
+        <dict>
+            <key>fileRef</key>
+            <string>100000000000000000000033</string>
             <key>isa</key>
             <string>PBXBuildFile</string>
         </dict>
@@ -575,7 +559,7 @@
             <key>sourceTree</key>
             <string>&lt;group&gt;</string>
         </dict>
-        <key>100000000000000000000010</key>
+        <key>100000000000000000000033</key>
         <dict>
             <key>isa</key>
             <string>PBXFileReference</string>
@@ -583,17 +567,6 @@
             <string>sourcecode.swift</string>
             <key>path</key>
             <string>Core/PermissionManager.swift</string>
-            <key>sourceTree</key>
-            <string>&lt;group&gt;</string>
-        </dict>
-        <key>100000000000000000000012</key>
-        <dict>
-            <key>isa</key>
-            <string>PBXFileReference</string>
-            <key>lastKnownFileType</key>
-            <string>sourcecode.swift</string>
-            <key>path</key>
-            <string>Features/AccessibilityManager.swift</string>
             <key>sourceTree</key>
             <string>&lt;group&gt;</string>
         </dict>
@@ -649,17 +622,6 @@
             <string>sourcecode.swift</string>
             <key>path</key>
             <string>Features/ToastManager.swift</string>
-            <key>sourceTree</key>
-            <string>&lt;group&gt;</string>
-        </dict>
-        <key>100000000000000000000024</key>
-        <dict>
-            <key>isa</key>
-            <string>PBXFileReference</string>
-            <key>lastKnownFileType</key>
-            <string>sourcecode.swift</string>
-            <key>path</key>
-            <string>UI/PermissionAlert.swift</string>
             <key>sourceTree</key>
             <string>&lt;group&gt;</string>
         </dict>
@@ -820,7 +782,7 @@
                 <string>008F07FB28D0A3BF0064A7B2</string>
                 <string>100000000000000000000006</string>
                 <string>100000000000000000000008</string>
-                <string>100000000000000000000010</string>
+                <string>100000000000000000000033</string>
                 <string>008F07FD28D0A3C80064A7B2</string>
             </array>
             <key>name</key>
@@ -832,7 +794,6 @@
         <dict>
             <key>children</key>
             <array>
-                <string>100000000000000000000012</string>
                 <string>100000000000000000000014</string>
                 <string>100000000000000000000016</string>
                 <string>100000000000000000000018</string>
@@ -850,7 +811,6 @@
         <dict>
             <key>children</key>
             <array>
-                <string>100000000000000000000024</string>
                 <string>100000000000000000000026</string>
             </array>
             <key>isa</key>
