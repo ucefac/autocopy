@@ -10,6 +10,7 @@ import Cocoa
 class AppUIState: ObservableObject {
     static let shared = AppUIState()
     @Published var isAutoCopyEnabled = true
+    @Published var isAccessibilityPermissionGranted = false
 }
 
 class StatusBarManager: NSObject {
@@ -19,6 +20,7 @@ class StatusBarManager: NSObject {
     private var menu: NSMenu?
     private var autoCopyMenuItem: NSMenuItem?
     private var autoStartMenuItem: NSMenuItem?
+    private var permissionStatusMenuItem: NSMenuItem?
 
     private override init() {
         super.init()
@@ -58,6 +60,15 @@ class StatusBarManager: NSObject {
         )
         autoCopyMenuItem?.target = self
         menu?.addItem(autoCopyMenuItem!)
+
+        // 权限状态提示
+        permissionStatusMenuItem = NSMenuItem(
+            title: "⚠️ 需要辅助功能权限",
+            action: #selector(openAccessibilitySettings(_:)),
+            keyEquivalent: ""
+        )
+        permissionStatusMenuItem?.target = self
+        menu?.addItem(permissionStatusMenuItem!)
 
         menu?.addItem(NSMenuItem.separator())
 
@@ -106,6 +117,18 @@ class StatusBarManager: NSObject {
         autoCopyMenuItem?.state = AppUIState.shared.isAutoCopyEnabled ? .on : .off
         autoStartMenuItem?.state = AutoStartManager.shared.isAutoStartEnabled ? .on : .off
         autoStartMenuItem?.isEnabled = AutoStartManager.shared.isAppInApplicationsFolder
+
+        // 更新权限状态显示
+        let isPermissionGranted = PermissionManager.shared.isAccessibilityPermissionGranted
+        AppUIState.shared.isAccessibilityPermissionGranted = isPermissionGranted
+
+        if isPermissionGranted {
+            permissionStatusMenuItem?.isHidden = true
+        } else {
+            permissionStatusMenuItem?.isHidden = false
+            permissionStatusMenuItem?.title = "⚠️ 需要辅助功能权限"
+        }
+
         updateStatusIcon()
     }
 
@@ -176,6 +199,10 @@ class StatusBarManager: NSObject {
 
     @objc private func quitApp(_ sender: NSMenuItem) {
         NSApplication.shared.terminate(nil)
+    }
+
+    @objc private func openAccessibilitySettings(_ sender: NSMenuItem) {
+        PermissionManager.shared.openAccessibilitySettings()
     }
 }
 
