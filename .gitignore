@@ -27,6 +27,14 @@ Cargo.lock
 # Test
 *.orig
 
+build
+
 # Config (user specific)
 .config/autocopy/autocopy.ini
 /.claude/
+
+.worktree
+/build/
+
+# 自动添加的通用忽略规则
+Makefile
