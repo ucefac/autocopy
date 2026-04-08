@@ -38,29 +38,20 @@ final class EventListener {
     private var lastFrontAppCheckTime: TimeInterval = 0
     private let frontAppCacheDuration: TimeInterval = 0.5 // 500ms缓存
 
-    private init() {
-        // 监听权限变化
-        PermissionManager.shared.onPermissionChange { [weak self] hasPermission in
-            guard let self = self else { return }
-            if hasPermission && ConfigManager.shared.get(\.autoCopyEnabled) {
-                self.start()
-            } else {
-                self.stop()
-            }
-        }
-    }
+    private init() {}
 
     // MARK: - 公共接口
 
     /// 启动事件监听
     func start() {
-        guard PermissionManager.shared.hasAccessibilityPermission else {
-            LogManager.shared.warn("EventListener", "无法启动监听，没有辅助功能权限")
+        guard !isListening else {
+            LogManager.shared.debug("EventListener", "事件监听器已经在运行")
             return
         }
 
-        guard !isListening else {
-            LogManager.shared.debug("EventListener", "事件监听器已经在运行")
+        // 检查是否有辅助功能权限
+        guard PermissionManager.shared.isAccessibilityPermissionGranted else {
+            LogManager.shared.error("EventListener", "无法启动事件监听器：辅助功能权限未授权")
             return
         }
 
