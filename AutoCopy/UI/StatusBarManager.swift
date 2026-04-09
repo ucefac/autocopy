@@ -36,16 +36,10 @@ class StatusBarManager: NSObject {
 
     private func updateStatusIcon() {
         guard let button = statusItem?.button else { return }
-
-        let iconName = AppUIState.shared.isAutoCopyEnabled ? "doc.on.clipboard" : "doc.on.clipboard.slash"
-        if #available(macOS 11.0, *) {
-            let image = NSImage(systemSymbolName: iconName, accessibilityDescription: "AutoCopy")
-            button.image = image
-        } else {
-            // 兼容旧版本，使用自定义图标
-            button.image = NSImage(named: "StatusBarIcon")
-        }
+        button.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "自动复制")
         button.image?.isTemplate = true
+        // 调整图标大小以匹配系统状态栏风格
+        button.image?.size = NSSize(width: 18, height: 18)
     }
 
     private func setupMenu() {
