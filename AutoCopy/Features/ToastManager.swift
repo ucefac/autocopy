@@ -141,7 +141,7 @@ class ToastManager {
                 backing: .buffered,
                 defer: false
             )
-            panel.level = .popUpMenu // 更高的层级，确保在全屏应用上方显示
+            panel.level = .init(rawValue: NSWindow.Level.screenSaver.rawValue - 1) // 低于系统弹窗/截图工具，高于普通应用和全屏应用
             panel.backgroundColor = .clear
             panel.isOpaque = false
             panel.hasShadow = true
@@ -225,7 +225,7 @@ class ToastManager {
 
             // 入场动画
             panel.alphaValue = 0
-            panel.orderFrontRegardless() // 确保在最前面显示
+            panel.orderFront(nil) // 显示在普通应用上方，但不会覆盖系统级弹窗
 
             switch config.animationType {
             case .scale:
