@@ -16,6 +16,11 @@ final class AppCoordinator {
     private(set) var appState = AppState()
     private var cancellables = Set<AnyCancellable>()
 
+    /// 上次配置同步的时间，用于防抖
+    private var lastSyncTime: Date?
+    /// 配置同步防抖间隔（200ms）
+    private let syncDebounceInterval: TimeInterval = 0.2
+
     // 模块引用
     private let instanceManager = InstanceManager.shared
     private let logManager = LogManager.shared
@@ -29,46 +34,48 @@ final class AppCoordinator {
     private let permissionManager = PermissionManager.shared
 
     private init() {
-        setupObservers()
-        setupPermissionObservers()
+        // 观察者将在 start() 中设置，避免过早接收通知
     }
 
     // MARK: - 应用启动流程
     func start() {
+        // 1. 先设置观察者，确保能正确拦截 ConfigManager 触发的通知
+        setupObservers()
+        setupPermissionObservers()
+
         logManager.info("AppCoordinator", "应用启动开始")
 
-        // 1. 单实例检测
+        // 2. 单实例检测
         guard instanceManager.acquireLock() else {
             logManager.info("AppCoordinator", "检测到已有实例运行，退出当前实例")
             NSApplication.shared.terminate(nil)
             return
         }
 
-        // 2. 日志系统已初始化（静态初始化）
+        // 3. 日志系统已初始化（静态初始化）
         logManager.info("AppCoordinator", "日志系统初始化完成")
 
-        // 3. 加载配置
-        configManager.loadConfig()
+        // 4. 加载配置（ConfigManager初始化时已自动加载，这里直接读取）
         appState.autoCopyEnabled = configManager.get(\.autoCopyEnabled)
         logManager.info("AppCoordinator", "配置加载完成")
 
-        // 4. 初始化状态栏菜单（已在StatusBarManager初始化时创建）
+        // 5. 初始化状态栏菜单（已在StatusBarManager初始化时创建）
         logManager.info("AppCoordinator", "状态栏菜单初始化完成")
 
-        // 5. 检查辅助功能权限
+        // 6. 检查辅助功能权限
         let permissionGranted = permissionManager.checkAccessibilityPermission()
         appState.accessibilityPermissionGranted = permissionGranted
         logManager.info("AppCoordinator", "辅助功能权限状态: \(permissionGranted ? "已授权" : "未授权")")
 
-        // 6. 初始化功能模块
+        // 7. 初始化功能模块
         initializeModules()
         logManager.info("AppCoordinator", "所有功能模块初始化完成")
 
-        // 7. 注册事件监听，建立事件流
+        // 8. 注册事件监听，建立事件流
         setupEventFlow()
         logManager.info("AppCoordinator", "事件流注册完成")
 
-        // 8. 根据权限和配置状态决定是否启动服务
+        // 9. 根据权限和配置状态决定是否启动服务
         if permissionGranted && appState.autoCopyEnabled {
             startServices()
         } else if !permissionGranted {
@@ -84,8 +91,8 @@ final class AppCoordinator {
 
     // MARK: - 初始化模块
     private func initializeModules() {
-        // 同步初始配置到各个模块
-        syncConfigToModules()
+        // 配置同步统一由 ConfigDidChange 通知触发，这里无需主动调用
+        // ConfigManager 初始化时会发送通知，AppCoordinator 会通过 setupObservers() 中的监听器处理
     }
 
     // MARK: - 设置事件流
@@ -152,16 +159,12 @@ final class AppCoordinator {
             if appState.autoCopyEnabled {
                 logManager.info("AppCoordinator", "辅助功能权限已获得，启动自动复制服务")
                 startServices()
-                // 显示提示
-                toastManager.showSuccess(message: "辅助功能权限已获得，自动复制功能已启用")
             }
         } else {
             // 权限已撤销，停止服务
             if eventListener.isListening {
                 logManager.warn("AppCoordinator", "辅助功能权限已被撤销，停止自动复制服务")
                 stopServices()
-                // 显示提示
-                toastManager.showError(message: "辅助功能权限已被撤销，自动复制功能已停用")
             }
         }
     }
@@ -189,9 +192,6 @@ final class AppCoordinator {
         logManager.info("AppCoordinator", "复制成功，累计复制次数: \(appState.copyCount)")
 
         // 显示Toast提示
-        if configManager.get(\.showToast) {
-            toastManager.showSuccess()
-        }
     }
 
 
@@ -246,12 +246,17 @@ final class AppCoordinator {
 
         // 同步事件监听参数
         // EventListener会通过ConfigManager实时读取
-
-        logManager.debug("AppCoordinator", "配置已同步到所有模块")
     }
 
     @objc private func configDidChange() {
+        // 防抖处理：如果最近刚同步过（200ms内），则跳过
+        if let lastSync = lastSyncTime, Date().timeIntervalSince(lastSync) < syncDebounceInterval {
+            logManager.debug("AppCoordinator", "配置同步防跳过，间隔小于\(syncDebounceInterval)s)")
+            return
+        }
+
         logManager.debug("AppCoordinator", "检测到配置变化，同步到所有模块")
+        lastSyncTime = Date()
         syncConfigToModules()
 
         // 更新应用状态
