@@ -1,5 +1,7 @@
 # AutoCopy
 
+> main 分支已过时，macOS 用户请使用 macos 分支
+
 > 选中文字后自动复制到剪贴板，无需手动按 Cmd（Ctrl）+C
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
