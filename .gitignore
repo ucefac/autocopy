@@ -30,3 +30,5 @@ Cargo.lock
 # Config (user specific)
 .config/autocopy/autocopy.ini
 /.claude/
+
+.worktree
