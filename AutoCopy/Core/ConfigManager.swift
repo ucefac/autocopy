@@ -11,8 +11,16 @@ final class ConfigManager {
     static let shared = ConfigManager()
 
     private(set) var config: Config = Config()
-    private var fileMonitor: DispatchSourceFileSystemObject?
     private let configQueue = DispatchQueue(label: "com.autocopy.configManager", attributes: .concurrent)
+
+    /// 保存配置时的是否正在保存标志位，用于防止文件监听器重复加载
+    private var isSaving: Bool = false
+    /// 文件修改时间，用于检测变化
+    private var lastConfigFileModTime: Date?
+    /// 定期检查配置文件的定时器
+    private var configCheckTimer: DispatchSourceTimer?
+    /// 保存操作完成后延迟清除标志位的时间（300ms），给文件监听器足够的响应时间
+    private let savingFlagDelay: TimeInterval = 0.3
 
     var configFilePath: String {
         Constants.configFilePath
@@ -43,6 +51,12 @@ final class ConfigManager {
                 // 读取INI文件内容
                 let content = try String(contentsOf: configURL, encoding: .utf8)
                 let configDict = self.parseINI(content)
+
+                // 获取文件修改时间并更新（在比较配置变化之前更新）
+                let fileAttributes = try FileManager.default.attributesOfItem(atPath: self.configFilePath)
+                if let modDate = fileAttributes[.modificationDate] as? Date {
+                    self.lastConfigFileModTime = modDate
+                }
 
                 var config = Config()
 
@@ -80,7 +94,7 @@ final class ConfigManager {
                         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                         .filter { !$0.isEmpty }
                     config.excludedApps = appIDs
-                    EventListener.shared.updateExcludedAppIDs(Set(appIDs))
+                    // 排除应用列表的同步统一由AppCoordinator的syncConfigToModules()处理
                 }
                 if let toastDisplayDuration = Double(advancedConfig["toastDisplayDuration"] ?? "") {
                     config.toastDisplayDuration = toastDisplayDuration
@@ -89,27 +103,40 @@ final class ConfigManager {
                     config.enableDragCopy = enableDragCopy
                 }
 
-                self.config = config
+                // 比较配置是否真正发生变化，避免不必要的通知和同步
+                let configChanged = self.config != config
+                if configChanged {
+                    self.config = config
+                    LogManager.shared.debug("ConfigManager", "配置文件加载成功，配置已更新")
 
-                // 先同步日志级别，再输出日志
-                LogManager.shared.setLogLevel(self.config.logLevel)
-                LogManager.shared.debug("ConfigManager", "配置文件加载成功")
+                    // 同步日志级别（使用异步执行避免阻塞）
+                    LogManager.shared.setLogLevel(config.logLevel)
 
-                // 发送配置变化通知
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: NSNotification.Name("ConfigDidChange"), object: nil)
+                    // 发送配置变化通知（由AppCoordinator处理同步逻辑）
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: NSNotification.Name("ConfigDidChange"), object: nil)
+                    }
+                } else {
+                    LogManager.shared.debug("ConfigManager", "配置文件加载成功，配置无变化")
                 }
             } catch {
                 LogManager.shared.error("ConfigManager", "配置文件解析失败: \(error.localizedDescription)，使用默认配置")
-                self.config = Config()
+                let newConfig = Config()
 
-                // 先同步日志级别，再输出日志
-                LogManager.shared.setLogLevel(self.config.logLevel)
-                self.saveConfigInternal()
+                // 比较配置是否真正发生变化
+                let configChanged = self.config != newConfig
+                if configChanged {
+                    self.config = newConfig
 
-                // 发送配置变化通知
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: NSNotification.Name("ConfigDidChange"), object: nil)
+                    // 同步日志级别（使用异步执行避免阻塞）
+                    LogManager.shared.setLogLevel(newConfig.logLevel)
+
+                    self.saveConfigInternal()
+
+                    // 发送配置变化通知（由AppCoordinator处理同步逻辑）
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: NSNotification.Name("ConfigDidChange"), object: nil)
+                    }
                 }
             }
         }
@@ -125,6 +152,9 @@ final class ConfigManager {
 
     /// 内部保存配置方法，必须在configQueue中调用
     private func saveConfigInternal() {
+        // 设置保存标志位，防止文件监听器重复加载
+        isSaving = true
+
         let configURL = URL(fileURLWithPath: configFilePath)
 
         do {
@@ -176,8 +206,18 @@ final class ConfigManager {
             // 写入INI文件
             try iniContent.write(to: configURL, atomically: true, encoding: .utf8)
             LogManager.shared.debug("ConfigManager", "配置文件保存成功")
+
+            // 延迟清除保存标志位，给文件监听器足够的响应时间（300ms）
+            DispatchQueue.global().asyncAfter(deadline: .now() + self.savingFlagDelay) { [weak self] in
+                self?.isSaving = false
+                LogManager.shared.debug("ConfigManager", "保存标志位已清除")
+            }
         } catch {
             LogManager.shared.error("ConfigManager", "保存配置文件失败: \(error.localizedDescription)")
+            // 保存失败时也要清除标志位
+            DispatchQueue.global().asyncAfter(deadline: .now() + self.savingFlagDelay) { [weak self] in
+                self?.isSaving = false
+            }
         }
     }
 
@@ -185,17 +225,14 @@ final class ConfigManager {
     /// - Parameters:
     ///   - keyPath: 配置项的键路径
     ///   - value: 新值
+    /// - 注意：配置同步统一由AppCoordinator的syncConfigToModules()处理
     func update<T>(_ keyPath: WritableKeyPath<Config, T>, to value: T) {
         configQueue.async(flags: .barrier) { [weak self] in
             guard let self = self else { return }
             self.config[keyPath: keyPath] = value
             self.saveConfigInternal()
 
-            // 如果是日志级别更新，同步到LogManager
-            if keyPath == \Config.logLevel, let logLevel = value as? LogLevel {
-                LogManager.shared.setLogLevel(logLevel)
-            }
-
+            // 注意：日志级别和模块同步统一由AppCoordinator的syncConfigToModules()处理
             // 发送配置变化通知
             DispatchQueue.main.async {
                 NotificationCenter.default.post(name: NSNotification.Name("ConfigDidChange"), object: nil)
@@ -214,31 +251,47 @@ final class ConfigManager {
 
     /// 设置文件监听器，监控配置文件变化
     private func setupFileMonitor() {
+        // 定期检查配置文件是否有变化（每1秒检查一次）
+        let checkInterval: TimeInterval = 1.0
+
+        // 初始化时先获取当前文件的修改时间，避免首次触发时误判
         let configURL = URL(fileURLWithPath: configFilePath)
-        let fileDescriptor = open(configURL.path, O_EVTONLY)
-
-        guard fileDescriptor != -1 else {
-            LogManager.shared.warn("ConfigManager", "无法打开配置文件进行监控")
-            return
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: configURL.path),
+           let modDate = attributes[.modificationDate] as? Date {
+            lastConfigFileModTime = modDate
+            LogManager.shared.debug("ConfigManager", "初始化文件修改时间: \(modDate)")
         }
 
-        fileMonitor = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: fileDescriptor,
-            eventMask: .write,
-            queue: DispatchQueue.global()
-        )
-
-        fileMonitor?.setEventHandler { [weak self] in
+        configCheckTimer = DispatchSource.makeTimerSource(queue: DispatchQueue.global())
+        configCheckTimer?.schedule(deadline: .now() + checkInterval, repeating: checkInterval)
+        configCheckTimer?.setEventHandler { [weak self] in
             guard let self = self else { return }
-            LogManager.shared.debug("ConfigManager", "检测到配置文件变化，重新加载配置")
-            self.loadConfig()
-        }
 
-        fileMonitor?.setCancelHandler {
-            close(fileDescriptor)
-        }
+            // 如果正在保存配置，跳过检查
+            if self.isSaving {
+                return
+            }
 
-        fileMonitor?.resume()
+            // 获取文件修改时间
+            let configURL = URL(fileURLWithPath: self.configFilePath)
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: configURL.path),
+                  let modDate = attributes[.modificationDate] as? Date else {
+                return
+            }
+
+            // 检查文件是否变化
+            if let lastModTime = self.lastConfigFileModTime {
+                if modDate > lastModTime {
+                    LogManager.shared.debug("ConfigManager", "检测到配置文件变化，重新加载配置")
+                    self.lastConfigFileModTime = modDate
+                    self.loadConfig()
+                }
+            } else {
+                // 首次记录修改时间
+                self.lastConfigFileModTime = modDate
+            }
+        }
+        configCheckTimer?.resume()
         LogManager.shared.debug("ConfigManager", "配置文件监听器已启动")
     }
 
@@ -294,6 +347,6 @@ final class ConfigManager {
     }
 
     deinit {
-        fileMonitor?.cancel()
+        configCheckTimer?.cancel()
     }
 }
