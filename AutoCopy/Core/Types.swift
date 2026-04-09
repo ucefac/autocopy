@@ -67,7 +67,7 @@ struct AppState: Codable {
 }
 
 // MARK: - 应用配置结构体
-struct Config: Codable {
+struct Config: Codable, Equatable {
     /// 双击间隔时间（秒）
     var doubleClickInterval: TimeInterval
     /// 最大点击偏移像素
@@ -93,6 +93,18 @@ struct Config: Codable {
     /// 是否启用拖拽选择自动复制
     var enableDragCopy: Bool
 
+    // MARK: - 剪贴板配置
+    /// 最大复制重试次数
+    var maxCopyRetries: Int
+    /// 模拟按键后初始读取延迟（秒）
+    var copyInitialDelay: TimeInterval
+    /// 重试延迟基础值（秒）
+    var copyRetryBaseDelay: TimeInterval
+    /// 按键按下间隔（秒）
+    var keyPressDelay: TimeInterval
+    /// 按键保持时长（秒）
+    var keyHoldDelay: TimeInterval
+
     init() {
         self.doubleClickInterval = Constants.DefaultConfig.doubleClickInterval
         self.maxClickOffset = Constants.DefaultConfig.maxClickOffset
@@ -107,6 +119,13 @@ struct Config: Codable {
         self.excludedApps = ["com.apple.dt.Xcode", "com.microsoft.VSCode"]
         self.toastDisplayDuration = 0.7
         self.enableDragCopy = true
+
+        // 剪贴板配置默认值
+        self.maxCopyRetries = 3
+        self.copyInitialDelay = 0.15
+        self.copyRetryBaseDelay = 0.05
+        self.keyPressDelay = 0.01
+        self.keyHoldDelay = 0.02
     }
 }
 
