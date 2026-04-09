@@ -57,6 +57,9 @@ final class ConfigManager {
                 if let minPressDuration = Double(generalConfig["minPressDuration"] ?? "") {
                     config.minPressDuration = minPressDuration
                 }
+                if let longPressThreshold = Double(generalConfig["longPressThreshold"] ?? "") {
+                    config.longPressThreshold = longPressThreshold
+                }
                 if let autoCopyEnabled = Bool(generalConfig["autoCopyEnabled"] ?? "") {
                     config.autoCopyEnabled = autoCopyEnabled
                 }
@@ -144,6 +147,9 @@ final class ConfigManager {
 
             iniContent += "# 最小按压时长（秒）\n"
             iniContent += "minPressDuration = \(config.minPressDuration)\n\n"
+
+            iniContent += "# 长按阈值（秒），超过此时长判定为长按，不触发复制\n"
+            iniContent += "longPressThreshold = \(config.longPressThreshold)\n\n"
 
             iniContent += "# 是否显示复制成功的Toast提示\n"
             iniContent += "showToast = \(config.showToast ? "true" : "false")\n\n"

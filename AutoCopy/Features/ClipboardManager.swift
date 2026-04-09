@@ -8,6 +8,54 @@
 import Foundation
 import AppKit
 
+/// 剪贴板内容快照，用于保存和恢复剪贴板的所有内容
+private struct PasteboardSnapshot {
+    let items: [[NSPasteboard.PasteboardType: Any]]
+
+    /// 从当前剪贴板创建快照
+    static func fromCurrent(_ pasteboard: NSPasteboard) -> PasteboardSnapshot {
+        var items: [[NSPasteboard.PasteboardType: Any]] = []
+        for item in pasteboard.pasteboardItems ?? [] {
+            var itemData: [NSPasteboard.PasteboardType: Any] = [:]
+            for type in item.types {
+                if let data = item.data(forType: type) {
+                    itemData[type] = data
+                } else if let string = item.string(forType: type) {
+                    itemData[type] = string
+                }
+            }
+            items.append(itemData)
+        }
+        return PasteboardSnapshot(items: items)
+    }
+
+    /// 将快照内容恢复到剪贴板
+    func restore(to pasteboard: NSPasteboard) {
+        pasteboard.clearContents()
+        for (index, item) in items.enumerated() {
+            let pasteboardItem = NSPasteboardItem()
+            for (type, value) in item {
+                if let data = value as? Data {
+                    pasteboardItem.setData(data, forType: type)
+                } else if let string = value as? String {
+                    pasteboardItem.setString(string, forType: type)
+                }
+            }
+            pasteboard.writeObjects([pasteboardItem])
+        }
+    }
+
+    /// 获取快照中的字符串内容（用于判断复制是否成功）
+    var stringContent: String? {
+        for item in items {
+            if let string = item[.string] as? String {
+                return string
+            }
+        }
+        return nil
+    }
+}
+
 final class ClipboardManager {
     static let shared = ClipboardManager()
 
@@ -36,40 +84,44 @@ final class ClipboardManager {
     }
 
     /// 模拟Cmd+C按键
-    private func simulateCopyShortcut(completion: @escaping () -> Void) {
+    private func simulateCopyShortcut(completion: @escaping (_ originalSnapshot: PasteboardSnapshot?) -> Void) {
         // 所有CGEvent操作必须在主线程执行
         DispatchQueue.main.async { [weak self] in
             guard let self = self else {
-                completion()
+                completion(nil)
                 return
             }
+
+            // 发送按键前立刻保存原始剪贴板快照，最小化时间差，减少竞态条件
+            let originalSnapshot = PasteboardSnapshot.fromCurrent(self.pasteboard)
 
             let source = CGEventSource(stateID: .hidSystemState)
 
             // 创建Cmd按下事件
             guard let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: true) else {
-                completion()
+                completion(originalSnapshot)
                 return
             }
             cmdDown.flags = .maskCommand
 
             // 创建C按下事件
             guard let cDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true) else {
-                completion()
+                completion(originalSnapshot)
                 return
             }
+        
             cDown.flags = .maskCommand
 
             // 创建C释放事件
             guard let cUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false) else {
-                completion()
+                completion(originalSnapshot)
                 return
             }
             cUp.flags = .maskCommand
 
             // 创建Cmd释放事件
             guard let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: false) else {
-                completion()
+                completion(originalSnapshot)
                 return
             }
 
@@ -83,7 +135,9 @@ final class ClipboardManager {
             cmdUp.post(tap: .cghidEventTap)
 
             // 延长延迟时间，确保系统有足够时间处理复制操作并更新剪贴板
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: completion)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                completion(originalSnapshot)
+            }
         }
     }
 
@@ -108,7 +162,8 @@ final class ClipboardManager {
             }
 
             if success {
-                LogManager.shared.info("ClipboardManager", "已复制到剪贴板，长度: \(text.count)")
+                let truncatedText = text.count > 200 ? "\(text.prefix(200))..." : text
+                LogManager.shared.info("ClipboardManager", "已复制到剪贴板，长度: \(text.count)，内容: \(truncatedText)")
                 DispatchQueue.main.async {
                     self.onCopySuccess?(text)
                     self.showToastIfNeeded()
@@ -145,23 +200,46 @@ final class ClipboardManager {
 
     // MARK: - 私有方法
 
+    /// 判断字符串是否全部由空白字符组成
+    private func isAllWhitespace(_ string: String) -> Bool {
+        return string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// 恢复剪贴板内容到原始状态
+    private func restoreOriginalContent(_ originalSnapshot: PasteboardSnapshot?) {
+        guard let snapshot = originalSnapshot else {
+            // 原始快照为空，清空剪贴板
+            DispatchQueue.main.sync {
+                self.pasteboard.clearContents()
+            }
+            LogManager.shared.debug("ClipboardManager", "原始快照为空，已清空剪贴板")
+            return
+        }
+
+        // 恢复原始快照的所有内容
+        DispatchQueue.main.sync {
+            snapshot.restore(to: self.pasteboard)
+        }
+        LogManager.shared.debug("ClipboardManager", "已恢复原剪贴板所有内容")
+    }
 
     /// 使用模拟快捷键执行复制
     private func performCopyWithSimulatedShortcut(retryCount: Int = 0) {
         let maxRetries = 2 // 最多重试2次，总共尝试3次
         LogManager.shared.debug("ClipboardManager", "使用模拟快捷键模式复制，尝试次数: \(retryCount + 1)")
 
-        // 保存当前剪贴板内容
-        let originalContent = getClipboardContent()
-
-        self.simulateCopyShortcut { [weak self] in
+        self.simulateCopyShortcut { [weak self] originalSnapshot in
             guard let self = self else { return }
 
             // 延迟后读取剪贴板内容，避免阻塞队列
             DispatchQueue.global().asyncAfter(deadline: .now() + 0.15) { [weak self] in
                 guard let self = self else { return }
 
+                let originalContent = originalSnapshot?.stringContent
                 guard let newContent = self.getClipboardContent() else {
+                    // 读取失败，恢复原内容
+                    self.restoreOriginalContent(originalSnapshot)
+
                     if retryCount < maxRetries {
                         LogManager.shared.debug("ClipboardManager", "读取剪贴板失败，准备重试")
                         // 短暂延迟后重试
@@ -177,7 +255,22 @@ final class ClipboardManager {
                     return
                 }
 
+                // 检查是否为空内容或者全是空白字符
+                if newContent.isEmpty || self.isAllWhitespace(newContent) {
+                    LogManager.shared.debug("ClipboardManager", "复制到空内容或全空白内容，判定为无效复制")
+                    // 恢复原剪贴板内容
+                    self.restoreOriginalContent(originalSnapshot)
+
+                    DispatchQueue.main.async {
+                        self.onCopyFailure?("没有选中文本")
+                    }
+                    return
+                }
+
                 if newContent == originalContent {
+                    // 内容没有变化，恢复原内容
+                    self.restoreOriginalContent(originalSnapshot)
+
                     if retryCount < maxRetries {
                         LogManager.shared.debug("ClipboardManager", "剪贴板内容未变化，准备重试")
                         // 短暂延迟后重试
@@ -193,7 +286,8 @@ final class ClipboardManager {
                     return
                 }
 
-                LogManager.shared.info("ClipboardManager", "通过快捷键复制成功，长度: \(newContent.count)，尝试次数: \(retryCount + 1)")
+                let truncatedContent = newContent.count > 200 ? "\(newContent.prefix(200))..." : newContent
+                LogManager.shared.info("ClipboardManager", "通过快捷键复制成功，长度: \(newContent.count)，尝试次数: \(retryCount + 1)，内容: \(truncatedContent)")
                 DispatchQueue.main.async {
                     self.onCopySuccess?(newContent)
                     self.showToastIfNeeded()

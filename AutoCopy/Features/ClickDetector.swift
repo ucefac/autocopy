@@ -32,6 +32,8 @@ final class ClickDetector {
     private var mouseDownTimestamp: TimeInterval = 0
     private var isDragging: Bool = false
     private var dragThreshold: CGFloat = CGFloat(Constants.DefaultConfig.maxClickOffset)
+    /// 长按阈值（秒），超过此时长判定为长按，不触发复制
+    private var longPressThreshold: TimeInterval = Constants.DefaultConfig.longPressThreshold
 
     // 防抖定时器
     private var debounceTimer: DispatchWorkItem?
@@ -104,6 +106,12 @@ final class ClickDetector {
             // 只有双击、三击才触发复制，单击不触发
             guard detectionType != .single else { return }
 
+            // 按压时长超过阈值，判定为长按操作，不触发复制
+            guard event.pressDuration < self.longPressThreshold else {
+                LogManager.shared.debug("ClickDetector", "按压时长过长（\(String(format: "%.2f", event.pressDuration))s > \(self.longPressThreshold)s），判定为长按，不触发复制")
+                return
+            }
+
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self = self else { return }
                 self.detectionQueue.async {
@@ -154,7 +162,8 @@ final class ClickDetector {
         detectionQueue.async { [weak self] in
             guard let self = self else { return }
             self.dragThreshold = CGFloat(ConfigManager.shared.get(\.maxClickOffset))
-            LogManager.shared.debug("ClickDetector", "配置已更新，拖拽阈值: \(self.dragThreshold)px")
+            self.longPressThreshold = ConfigManager.shared.get(\.longPressThreshold)
+            LogManager.shared.debug("ClickDetector", "配置已更新，拖拽阈值: \(self.dragThreshold)px, 长按阈值: \(self.longPressThreshold)s")
         }
     }
 

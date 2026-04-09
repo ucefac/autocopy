@@ -22,7 +22,9 @@ enum Constants {
         /// 最大点击偏移像素
         static let maxClickOffset: Int = 5
         /// 最小按压时长（秒）
-        static let minPressDuration: TimeInterval = 0.1
+        static let minPressDuration: TimeInterval = 0.15
+        /// 长按阈值（秒），超过此时长判定为长按，不触发复制
+        static let longPressThreshold: TimeInterval = 0.5
         /// 是否启用自动复制
         static let autoCopyEnabled: Bool = true
         /// 是否显示复制成功提示

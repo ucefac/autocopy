@@ -74,6 +74,8 @@ struct Config: Codable {
     var maxClickOffset: Int
     /// 最小按压时长（秒）
     var minPressDuration: TimeInterval
+    /// 长按阈值（秒），超过此时长判定为长按，不触发复制
+    var longPressThreshold: TimeInterval
     /// 是否启用自动复制
     var autoCopyEnabled: Bool
     /// 是否显示复制成功提示
@@ -95,6 +97,7 @@ struct Config: Codable {
         self.doubleClickInterval = Constants.DefaultConfig.doubleClickInterval
         self.maxClickOffset = Constants.DefaultConfig.maxClickOffset
         self.minPressDuration = Constants.DefaultConfig.minPressDuration
+        self.longPressThreshold = Constants.DefaultConfig.longPressThreshold
         self.autoCopyEnabled = Constants.DefaultConfig.autoCopyEnabled
         self.showToast = Constants.DefaultConfig.showToast
         self.logLevel = .debug
