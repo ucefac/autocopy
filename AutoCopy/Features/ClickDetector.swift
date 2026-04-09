@@ -37,10 +37,6 @@ final class ClickDetector {
 
     // 防抖定时器
     private var debounceTimer: DispatchWorkItem?
-    // 重复内容防重
-    private var lastCopiedText: String?
-    private var lastCopyTime: TimeInterval = 0
-    private let duplicateCopyInterval: TimeInterval = 1.0 // 1秒内相同内容不重复复制
 
     private init() {
         // 监听配置变化
