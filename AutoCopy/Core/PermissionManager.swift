@@ -60,9 +60,6 @@ final class PermissionManager {
 
         // 弹出系统权限提示
         checkAccessibilityPermission(prompt: true)
-
-        // 显示引导提示框
-        showPermissionGuideAlert()
     }
 
     /// 打开系统辅助功能设置页面
