@@ -126,11 +126,31 @@ final class LogManager {
 
     /// 设置日志级别
     /// - Parameter level: 新的日志级别
+    /// - 注意：只有当日志级别真正发生变化时才更新并打印日志，相同值直接返回
     func setLogLevel(_ level: LogLevel) {
+        // 使用 async 确保不会死锁
         logQueue.async { [weak self] in
             guard let self = self else { return }
+
+            // 添加大小写不敏感的比较，只有级别真正变化时才更新
+            guard level.rawValue.lowercased() != self.currentLogLevel.rawValue.lowercased() else {
+                return // 级别相同，直接返回，避免重复打印日志
+            }
+
             self.currentLogLevel = level
-            self.info("LogManager", "日志级别已设置为: \(level.rawValue)")
+
+            // 同步执行 info 日志，确保立即写入
+            let timestamp = self.dateFormatter.string(from: Date())
+            let logString = "[\(timestamp)] [INFO] [LogManager] 日志级别已设置为: \(level.rawValue)\n"
+
+            #if DEBUG
+            print(logString, terminator: "")
+            #endif
+
+            self.logBuffer.append(logString)
+            if self.logBuffer.count >= self.bufferSize {
+                self.flushBuffer()
+            }
         }
     }
 
