@@ -11,7 +11,7 @@ class ToastManager {
     static let shared = ToastManager()
 
     private var toastPanel: NSPanel?
-    private let defaultToastSize = NSSize(width: 40, height: 40)
+    private let defaultToastSize = NSSize(width: 26, height: 26)
     private let textToastSize = NSSize(width: 300, height: 60)
     private let animationDuration: TimeInterval = 0.15
     private let defaultDisplayDuration: TimeInterval = 0.7
@@ -42,24 +42,33 @@ class ToastManager {
 
     /// 显示复制成功提示
     func showSuccess() {
-        // 创建图标内容视图
-        let iconLabel = NSTextField(frame: .zero)
-        iconLabel.stringValue = "✓"
-        iconLabel.font = NSFont.systemFont(ofSize: 20, weight: .bold)
+        let containerView = NSView(frame: NSRect(x: 0, y: 0, width: defaultToastSize.width, height: defaultToastSize.height))
+
+        let checkmark = "✓"
+        let font = NSFont.systemFont(ofSize: 14, weight: .bold)
+
+        // 创建勾号标签，使用 Auto Layout 实现完美居中
+        let iconLabel = NSTextField(labelWithString: checkmark)
+        iconLabel.font = font
         iconLabel.textColor = .white
-        iconLabel.alignment = .center
-        iconLabel.isBezeled = false
-        iconLabel.isEditable = false
-        iconLabel.drawsBackground = false
+        iconLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        containerView.addSubview(iconLabel)
+
+        // 添加居中约束，同时微调垂直偏移以实现视觉完美居中
+        NSLayoutConstraint.activate([
+            iconLabel.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            iconLabel.centerYAnchor.constraint(equalTo: containerView.centerYAnchor, constant: -0.5)
+        ])
 
         // 构造配置
         let config = ToastConfiguration(
             size: defaultToastSize,
-            cornerRadius: 20,
+            cornerRadius: 13,
             displayDuration: defaultDisplayDuration,
             position: .followMouse,
             animationType: .scale,
-            contentView: iconLabel
+            contentView: containerView
         )
 
         showToast(with: config)
@@ -148,20 +157,18 @@ class ToastManager {
             panel.ignoresMouseEvents = true
             panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
 
-            // 创建视觉效果视图（统一配置，仅圆角不同）
-            let visualEffectView = NSVisualEffectView(frame: panel.contentView?.bounds ?? .zero)
-            visualEffectView.material = .hudWindow
-            visualEffectView.blendingMode = .behindWindow
-            visualEffectView.state = .active
-            visualEffectView.wantsLayer = true
-            visualEffectView.layer?.cornerRadius = config.cornerRadius
-            visualEffectView.layer?.masksToBounds = true
+            // 使用普通NSView作为容器，纯色背景无任何效果
+            let containerView = NSView(frame: panel.contentView?.bounds ?? .zero)
+            containerView.wantsLayer = true
+            containerView.layer?.cornerRadius = config.cornerRadius
+            containerView.layer?.masksToBounds = true
+            containerView.layer?.backgroundColor = NSColor(red: 53/255, green: 209/255, blue: 140/255, alpha: 1.0).cgColor
 
             // 添加内容视图
-            config.contentView.frame = visualEffectView.bounds
+            config.contentView.frame = containerView.bounds
             config.contentView.autoresizingMask = [.width, .height]
-            visualEffectView.addSubview(config.contentView)
-            panel.contentView?.addSubview(visualEffectView)
+            containerView.addSubview(config.contentView)
+            panel.contentView?.addSubview(containerView)
 
             // 计算Toast位置
             var toastOrigin: NSPoint = .zero
@@ -185,9 +192,9 @@ class ToastManager {
                 // 转换坐标系统（从Quartz坐标到AppKit坐标）
                 let adjustedMouseY = screen.frame.height - mouseLocation.y + screen.frame.origin.y
 
-                // 计算toast位置：鼠标右上角
-                var toastX = mouseLocation.x + self.margin
-                var toastY = adjustedMouseY + self.margin
+                // 计算toast位置：鼠标中心
+                var toastX = mouseLocation.x - config.size.width / 2
+                var toastY = adjustedMouseY - config.size.height / 2
 
                 // 确保toast不会超出屏幕边界
                 let screenVisibleFrame = screen.visibleFrame
