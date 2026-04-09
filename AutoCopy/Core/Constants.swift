@@ -9,10 +9,10 @@ import Foundation
 
 enum Constants {
     // MARK: - 配置文件
-    static let configDirectory: String = "~/.config/autocopy/"
+    static let configDirectory: String = "~/.config/autocopy"
     static let configFileName: String = "autocopy.ini"
     static var configFilePath: String {
-        (configDirectory as NSString).expandingTildeInPath + configFileName
+        (configDirectory as NSString).expandingTildeInPath + "/" + configFileName
     }
 
     // MARK: - 默认配置
