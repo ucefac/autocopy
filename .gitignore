@@ -38,3 +38,16 @@ build
 
 # 自动添加的通用忽略规则
 Makefile
+
+# Xcode 个人配置
+*.xcuserstate
+*.xcworkspace
+xcuserdata/
+
+# 本地签名配置
+*.provisioningprofile
+*.p12
+
+# Swift Package Manager
+.swiftpm/xcode/
+.build/
