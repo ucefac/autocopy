@@ -60,10 +60,7 @@ final class EventListener {
             self.setupEventMonitors()
             self.isListening = true
             LogManager.shared.info("EventListener", "事件监听器已启动")
-
-            // 更新排除的应用列表
-            let excludedApps = ConfigManager.shared.get(\.excludedApps)
-            self.updateExcludedAppIDs(Set(excludedApps))
+            // 注意：排除的应用列表由AppCoordinator的syncConfigToModules()统一处理
         }
     }
 
@@ -81,9 +78,14 @@ final class EventListener {
 
     /// 更新排除应用列表
     /// - Parameter appIDs: 要排除的应用Bundle ID集合
+    /// - 注意：只有当列表真正发生变化时才更新并打印日志，相同列表直接返回
     func updateExcludedAppIDs(_ appIDs: Set<String>) {
-        eventQueue.async { [weak self] in
+        eventQueue.async(flags: .barrier) { [weak self] in
             guard let self = self else { return }
+            // 比较集合是否真正变化，只有变化时才更新
+            guard appIDs != self.excludedAppIDs else {
+                return // 列表相同，直接返回，避免重复打印日志
+            }
             self.excludedAppIDs = appIDs
             LogManager.shared.debug("EventListener", "已更新排除应用列表，共\(appIDs.count)个应用")
         }
